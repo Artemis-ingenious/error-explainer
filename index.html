@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Error Message Explainer</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+  /* ---- Theme: warm paper + teal (after Cissnei23/tiny_things). Change tokens here. ---- */
+  :root {
+    --bg: #F5F0E8;
+    --bg-alt: #EDE8D8;
+    --card: #FAF7F0;
+    --text: #2C2416;
+    --muted: #8A7B68;
+    --border: #CEC5B0;
+    --accent: #317F7D;
+    --accent-h: #256462;
+    --accent-dim: #E3F0EF;
+    --danger: #8B3A3A;
+    --danger-bg: #F9EDEC;
+    --danger-border: #D4A5A0;
+    --ochre: #7D5A31;
+    --ochre-bg: #F3E8D0;
+    --ochre-border: #D9C7A0;
+
+    /* serif everywhere except code; CJK falls back to system serif faces */
+    --serif: 'Lora', Georgia, 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+    --display: 'Playfair Display', 'Lora', Georgia, 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+    --mono: 'Courier Prime', 'Courier New', ui-monospace, Consolas, monospace;
+    --radius: 3px;
+    --sb-w: 52px;
+    --sb-open: 192px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; display: flex; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font: 16px/1.78 var(--serif);
+  }
+  button, select, textarea { font-family: inherit; }
+  [hidden] { display: none !important; }
+  .spacer { flex: 1; }
+  .ic { display: inline-flex; flex: none; }
+  .ic svg { width: 18px; height: 18px; display: block; }
+
+  /* ---- sidebar ---- */
+  #sb {
+    width: var(--sb-w); flex: none; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--bg-alt); border-right: 1px solid var(--border); transition: width .22s ease;
+  }
+  #sb.open { width: var(--sb-open); }
+  .sb-head {
+    display: flex; align-items: center; gap: 12px; height: 50px; padding: 0 17px; flex: none;
+    background: none; border: 0; border-bottom: 1px solid var(--border); color: var(--text); cursor: pointer; text-align: left;
+  }
+  .sb-head .title { font: 700 17px var(--display); }
+  .sb-nav { flex: 1; padding-top: 6px; overflow-y: auto; overflow-x: hidden; }
+  .sb-item {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 17px;
+    background: none; border: 0; color: var(--text); cursor: pointer; text-align: left; font-size: 15px;
+  }
+  .sb-item:hover, .sb-item.active { background: var(--accent-dim); color: var(--accent); }
+  .sb-lbl { white-space: nowrap; opacity: 0; transition: opacity .15s; }
+  #sb.open .sb-lbl { opacity: 1; }
+  .sb-lbl em { font-size: 13px; color: var(--muted); margin-left: 4px; }
+  .sb-panel { display: none; width: var(--sb-open); padding: 4px 14px 12px; }
+  #sb.open .sb-panel.open { display: block; }
+  .sb-panel select { width: 100%; }
+  .ex-btn {
+    display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+    color: var(--text); font-size: 14px; padding: 4px 6px; border-radius: 2px; white-space: nowrap;
+  }
+  .ex-btn:hover { background: var(--bg); color: var(--accent); }
+  .sb-foot { flex: none; padding: 12px 0; text-align: center; border-top: 1px solid var(--border); }
+  .pill { font: 11px/1 var(--mono); color: var(--muted); border: 1px solid var(--border); border-radius: 99px; padding: 3px 8px; }
+
+  select {
+    font-size: 14px; color: var(--text); background: var(--card);
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 8px; outline: none; cursor: pointer;
+  }
+  select:hover, select:focus { border-color: var(--accent); }
+  .ghost {
+    font-size: 13px; color: var(--muted); background: none; cursor: pointer;
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 3px 10px;
+  }
+  .ghost:hover { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+  /* ---- main: top panel / divider / bottom panel ---- */
+  #main { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; }
+
+  #tp { flex: none; height: 36%; min-height: 112px; display: flex; flex-direction: column; transition: height .25s ease; }
+  #tp.dragging { transition: none; }
+  .tp-bar {
+    display: flex; align-items: center; gap: 12px; height: 50px; flex: none; padding: 0 16px;
+    border-bottom: 1px solid var(--border); font-size: 14px; color: var(--muted);
+  }
+  #tp-info { font-style: italic; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hint { font-size: 12px; white-space: nowrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: #fff; background: var(--accent); cursor: pointer;
+    border: 1px solid var(--accent); border-radius: var(--radius); padding: 4px 16px;
+  }
+  .btn:hover { background: var(--accent-h); border-color: var(--accent-h); }
+  .btn .ic svg { width: 14px; height: 14px; }
+
+  .switch { display: inline-flex; align-items: center; gap: 7px; background: none; border: 0; padding: 0; cursor: pointer; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .switch i { position: relative; width: 26px; height: 14px; border-radius: 99px; border: 1px solid var(--border); background: var(--bg-alt); transition: background .15s, border-color .15s; }
+  .switch i::after { content: ""; position: absolute; top: 1px; left: 1px; width: 10px; height: 10px; border-radius: 50%; background: var(--muted); transition: left .15s, background .15s; }
+  .switch.on { color: var(--text); }
+  .switch.on i { background: var(--accent-dim); border-color: var(--accent); }
+  .switch.on i::after { left: 13px; background: var(--accent); }
+
+  #dz { flex: 1; min-height: 0; display: flex; }
+  #dz.over { outline: 2px dashed var(--accent); outline-offset: -6px; background: var(--accent-dim); }
+  textarea {
+    flex: 1; min-width: 0; resize: none; border: 0; outline: 0; background: transparent; color: var(--text);
+    padding: 14px 18px; font: 14px/1.6 var(--mono);
+  }
+  textarea::placeholder { font: italic 15px/1.6 var(--serif); color: var(--muted); }
+  .warn { margin: 0; padding: 6px 18px; flex: none; font-size: 14px; color: var(--danger); background: var(--danger-bg); border-top: 1px solid var(--danger-border); }
+  .warn button { background: none; border: 0; color: var(--accent); font-size: inherit; text-decoration: underline; cursor: pointer; padding: 0 2px; }
+
+  #dv {
+    flex: none; height: 7px; position: relative; cursor: row-resize; touch-action: none;
+    background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  #dv::after { content: ""; position: absolute; left: 50%; top: 2px; width: 32px; height: 2px; margin-left: -16px; background: var(--border); border-radius: 2px; }
+  #dv:hover, #dv.drag { background: var(--accent-dim); }
+
+  #bp { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 28px 36px; }
+  #bp::-webkit-scrollbar { width: 5px; }
+  #bp::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  #stage { max-width: 860px; }
+
+  .empty h1 { font: 700 34px/1.2 var(--display); margin: 0 0 8px; letter-spacing: -.2px; }
+  .empty .sub { font-style: italic; color: var(--muted); margin: 0 0 26px; }
+  .empty .try { font: 600 12px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font-size: 14px; color: var(--text); background: none; cursor: pointer;
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 14px;
+  }
+  .chip:hover { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+  /* the pasted error, echoed above the answer, with its anatomy marked */
+  .ask { background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 22px; animation: rise .25s ease both; }
+  .ask-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 6px; }
+  .ask-meta .lang { font: 600 12px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .facts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fact { display: inline-flex; align-items: baseline; gap: 6px; font: 12px/1.5 var(--mono); padding: 0 9px; border-radius: 99px; border: 1px solid; }
+  .fact b { font: 600 10px var(--display); letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+  .fact.loc  { color: var(--accent-h); background: var(--accent-dim); border-color: var(--accent); }
+  .fact.type { color: var(--danger);   background: var(--danger-bg);  border-color: var(--danger-border); }
+  .fact.sym  { color: var(--ochre);    background: var(--ochre-bg);   border-color: var(--ochre-border); }
+  .ask pre { margin: 0; font: 14px/1.6 var(--mono); white-space: pre-wrap; word-break: break-word; }
+  .ask mark { color: inherit; background: none; border-radius: 2px; padding: 0 2px; margin: 0 -1px; }
+  .ask mark.a-loc  { color: var(--accent-h); background: var(--accent-dim); box-shadow: inset 0 -2px 0 var(--accent); }
+  .ask mark.a-type { color: var(--danger);   background: var(--danger-bg);  box-shadow: inset 0 -2px 0 var(--danger-border); }
+  .ask mark.a-sym  { color: var(--ochre);    background: var(--ochre-bg);   box-shadow: inset 0 -2px 0 var(--ochre-border); }
+  .ask.collapsed pre { max-height: 10em; overflow: hidden;
+    -webkit-mask-image: linear-gradient(#000 65%, transparent); mask-image: linear-gradient(#000 65%, transparent); }
+  .ask .more { background: none; border: 0; color: var(--accent); font-size: 13px; padding: 4px 0 0; cursor: pointer; }
+  .ask .more:hover { color: var(--accent-h); text-decoration: underline; }
+
+  /* answer */
+  .sec { margin-bottom: 20px; animation: rise .3s ease both; }
+  .sec-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .sec-head h2 { font: 600 20px/1.3 var(--display); margin: 0 0 -1px; padding-bottom: 2px; border-bottom: 2px solid var(--accent); }
+  .sec-head .ghost { margin-bottom: 4px; }
+  .md { line-height: 1.82; }
+  .md > :first-child { margin-top: 0; }
+  .md > :last-child { margin-bottom: 0; }
+  .md p, .md ul, .md ol { margin: 0 0 12px; }
+  .md code { font: .88em var(--mono); background: var(--bg-alt); padding: .08em .35em; border-radius: 2px; }
+  .code { border: 1px solid var(--border); border-radius: var(--radius); margin: 12px 0; background: var(--bg-alt); overflow: hidden; }
+  .code-head { display: flex; align-items: center; justify-content: space-between; padding: 3px 6px 3px 14px; border-bottom: 1px solid var(--border); font: 12px var(--mono); color: var(--muted); }
+  .code-head .ghost { border-color: transparent; padding: 1px 8px; font-size: 12px; }
+  .code pre { margin: 0; padding: 12px 14px; overflow-x: auto; font-size: 14px; line-height: 1.65; }
+  .code pre code, .code .hljs { font: 14px/1.65 var(--mono); background: transparent; padding: 0; color: var(--text); }
+  .code pre::-webkit-scrollbar { height: 5px; }
+  .code pre::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* syntax tokens, warm palette */
+  .hljs-keyword, .hljs-selector-tag, .hljs-literal { color: var(--danger); }
+  .hljs-string, .hljs-regexp { color: #5A7A3A; }
+  .hljs-number, .hljs-symbol { color: var(--ochre); }
+  .hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
+  .hljs-title, .hljs-title.function_, .hljs-title.class_ { color: var(--accent-h); }
+  .hljs-built_in, .hljs-type, .hljs-attr, .hljs-params { color: #7A5C3A; }
+  .hljs-meta { color: var(--ochre); }
+
+  /* streaming details */
+  .caret { display: inline-block; width: .5em; height: 1.05em; margin-left: 2px; vertical-align: text-bottom; background: var(--accent); animation: blink 1s steps(2) infinite; }
+  .thinking::after { content: "…"; animation: blink 1s steps(2) infinite; color: var(--muted); }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .ask, .sec, .caret, .thinking::after, .stats.live::before { animation: none; } }
+
+  .foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; }
+  .stats { font: 12px var(--mono); color: var(--muted); }
+  .stats.live::before { content: "●"; margin-right: 6px; color: var(--accent); animation: blink 1s steps(2) infinite; }
+  .error-box {
+    color: var(--danger); background: var(--danger-bg); border: 1px solid var(--danger-border);
+    border-radius: var(--radius); padding: 10px 14px; font-size: 14px; white-space: pre-wrap; margin-top: 12px;
+  }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 8px); opacity: 0; pointer-events: none;
+    background: var(--text); color: var(--bg); font-size: 14px; padding: 7px 16px; border-radius: var(--radius);
+    transition: opacity .2s, transform .2s;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 760px) { .hint { display: none; } }
+</style>
+</head>
+<body>
+
+<aside id="sb">
+  <button class="sb-head" id="sb-toggle" type="button" title="Toggle sidebar">
+    <span class="ic" data-ic="panel"></span><span class="sb-lbl title">Explainer</span>
+  </button>
+  <nav class="sb-nav">
+    <button class="sb-item" id="btn-lang" type="button" title="Language">
+      <span class="ic" data-ic="globe"></span><span class="sb-lbl">Language <em id="lang-cur">Auto</em></span>
+    </button>
+    <div class="sb-panel" id="pnl-lang">
+      <select id="lang">
+        <option value="auto" selected>Auto</option>
+        <option value="python">Python</option>
+        <option value="java">Java</option>
+        <option value="cpp">C++</option>
+      </select>
+    </div>
+    <button class="sb-item" id="btn-ex" type="button" title="Examples">
+      <span class="ic" data-ic="bulb"></span><span class="sb-lbl">Examples</span>
+    </button>
+    <div class="sb-panel" id="pnl-ex"></div>
+    <button class="sb-item" id="btn-copy" type="button" title="Copy fix">
+      <span class="ic" data-ic="copy"></span><span class="sb-lbl">Copy fix</span>
+    </button>
+    <button class="sb-item" id="btn-md" type="button" title="Copy as Markdown">
+      <span class="ic" data-ic="file"></span><span class="sb-lbl">Copy as Markdown</span>
+    </button>
+    <button class="sb-item" id="btn-clr" type="button" title="Clear">
+      <span class="ic" data-ic="trash"></span><span class="sb-lbl">Clear</span>
+    </button>
+  </nav>
+  <div class="sb-foot"><span class="pill" id="mode"></span></div>
+</aside>
+
+<div id="main">
+  <section id="tp">
+    <div class="tp-bar">
+      <span class="ic" data-ic="terminal"></span>
+      <span id="tp-info"></span>
+      <span class="spacer"></span>
+      <button class="switch" id="auto-tg" type="button" role="switch" aria-checked="true" title="Explain automatically as soon as you paste an error"><i></i>Auto-explain</button>
+      <span class="hint">Ctrl + Enter</span>
+      <button class="btn" id="go" type="button"></button>
+      <button class="ghost" id="share" type="button">Share link</button>
+    </div>
+    <div id="dz">
+      <textarea id="input" spellcheck="false" placeholder="Paste an error message here, or drop a .log / .txt file…"></textarea>
+    </div>
+    <p class="warn" id="warn" hidden></p>
+  </section>
+
+  <div id="dv" role="separator" aria-orientation="horizontal" title="Drag to resize"></div>
+
+  <section id="bp"><div id="stage"></div></section>
+</div>
+
+<div id="toast"></div>
+
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/highlight.min.js"></script>
+<script src="core.js"></script>       <!-- system prompt, gate rules, parsing, error anatomy (shared with the CLI) -->
+<script src="examples.js"></script>   <!-- demo examples -->
+<script>
+/* =====================================================================
+ * Config  (model contract lives in core.js)
+ *   mode 'mock'   : canned answers for the example chips (no backend needed)
+ *   mode 'ollama' : OpenAI-compatible /v1/chat/completions (Ollama, vLLM, ...)
+ * Override without editing:  index.html?mode=ollama&api=<url>&model=<name>&auto=0
+ * ===================================================================== */
+const { LANG_LABEL, detect, parseSections, annotate, buildMessages, clip } = EXPLAINER;
+const params = new URLSearchParams(location.search);
+const CONFIG = {
+  ...EXPLAINER.defaults,
+  mode: params.get('mode') || 'mock',
+  apiUrl: params.get('api') || EXPLAINER.defaults.apiUrl,
+  model: params.get('model') || EXPLAINER.defaults.model,
+};
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode etc. */ } },
+};
+let autoOn = params.has('auto') ? params.get('auto') !== '0' : store.get('autoExplain') !== '0';   // default: on
+
+/* ---------------- Mock backend ---------------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function* mockStream(text, signal) {
+  const hit = EXAMPLES.find(e => e.text.trim() === text.trim());
+  const out = hit ? hit.answer
+    : '## Why\nMock mode only answers the example errors.\n\n## Fix\nStart the model server, then open this page with `?mode=ollama`.';
+  await sleep(350);
+  for (let i = 0; i < out.length; i += 3) {
+    if (signal.aborted) return;
+    yield out.slice(i, i + 3);
+    await sleep(14);
+  }
+}
+
+/* ---------------- Real backend (OpenAI-compatible, SSE) ---------------- */
+async function* apiStream(text, lang, signal) {
+  const res = await fetch(CONFIG.apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: CONFIG.model,
+      messages: buildMessages(text, lang),
+      stream: true,
+      temperature: CONFIG.temperature,
+      max_tokens: CONFIG.maxTokens,
+    }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}\n${(await res.text()).slice(0, 300)}`);
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const data = line.slice(5).trim();
+      if (!data || data === '[DONE]') continue;
+      try {
+        const delta = JSON.parse(data).choices?.[0]?.delta?.content;
+        if (delta) yield delta;
+      } catch { /* ignore partial/keep-alive lines */ }
+    }
+  }
+}
+
+/* ---------------- Markdown rendering (HTML in model output is escaped) ---------------- */
+const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+marked.use({
+  mangle: false, headerIds: false,
+  renderer: {
+    code(code, info) {
+      const lang = (info || '').trim().split(/\s+/)[0].toLowerCase();
+      const alias = { 'c++': 'cpp', cc: 'cpp', sh: 'bash', shell: 'bash', py: 'python' }[lang] || lang;
+      const html = hljs.getLanguage(alias) ? hljs.highlight(code, { language: alias }).value : esc(code);
+      return `<div class="code"><div class="code-head"><span>${esc(lang || 'text')}</span>` +
+        `<button class="ghost copy" type="button">Copy</button></div>` +
+        `<pre><code class="hljs">${html}</code></pre></div>`;
+    },
+    html: h => esc(h),
+    link: (href, title, text) => text,
+    image: (href, title, text) => esc(text || ''),
+  },
+});
+
+/* ---------------- UI ---------------- */
+const $ = id => document.getElementById(id);
+const sb = $('sb'), tp = $('tp'), bp = $('bp'), stage = $('stage'), input = $('input'),
+      go = $('go'), warn = $('warn'), langSel = $('lang');
+let abort = null;
+let lastRun = null;                                    // { text, lang, answer } of the latest finished answer
+let shareId = new URLSearchParams(location.search).get('share');
+async function loadShared() {
+  if (!shareId) return;
+  try {
+    const r = await fetch(`/api/shares/${encodeURIComponent(shareId)}`);
+    if (!r.ok) throw new Error('Share not found');
+    const data = await r.json();
+    input.value = data.text; onInput(); stage.innerHTML = '';
+    addAsk(data.text, data.lang); const ans = addAnswer();
+    renderAnswer(ans, data.answer, false); ans.querySelector('.thinking').hidden = true;
+    ans.querySelector('.stats').textContent = 'Shared answer';
+    lastRun = {text:data.text, lang:data.lang, answer:data.answer};
+  } catch { toast('Could not load shared answer'); }
+}
+async function shareAnswer() {
+  if (!lastRun) return toast('Explain an error first');
+  try {
+    const r = await fetch(shareId ? `/api/shares/${encodeURIComponent(shareId)}` : '/api/shares', {
+      method: shareId ? 'PUT' : 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(lastRun)
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const data = await r.json(); shareId = data.id;
+    const url = new URL(location.href); url.searchParams.set('share', shareId);
+    await navigator.clipboard.writeText(url.href); history.replaceState(null, '', url);
+    toast('Share link copied; updates sync every 5 seconds');
+  } catch (e) { toast(`Share failed: ${e.message}`); }
+}
+$('share').onclick = shareAnswer;
+if (shareId) setInterval(loadShared, 5000);
+let userResized = false;                               // once the user drags the divider, stop auto-resizing the top panel
+/* The paste box is empty once an answer is on screen: give the room to the answer. */
+const compactTop = () => { if (!userResized) tp.style.height = '112px'; };
+const restoreTop = () => { if (!userResized) tp.style.height = ''; };
+
+/* icons (Lucide-style paths, inline so nothing is fetched) */
+const ICONS = {
+  panel: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  bulb: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+  terminal: '<polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  stop: '<rect width="14" height="14" x="5" y="5" rx="1"/>',
+};
+const svg = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+document.querySelectorAll('[data-ic]').forEach(el => { el.innerHTML = svg(el.dataset.ic); });
+
+$('mode').textContent = CONFIG.mode === 'mock' ? 'mock' : 'local';
+$('mode').title = CONFIG.mode === 'mock' ? 'Mock mode: canned answers' : `Model: ${CONFIG.model}`;
+
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+/* ---- auto-explain switch ---- */
+function paintAuto() { $('auto-tg').classList.toggle('on', autoOn); $('auto-tg').setAttribute('aria-checked', String(autoOn)); }
+$('auto-tg').onclick = () => { autoOn = !autoOn; store.set('autoExplain', autoOn ? '1' : '0'); paintAuto(); toast(`Auto-explain ${autoOn ? 'on' : 'off'}`); };
+/* New text arrived (paste / drop / example): explain it right away, replacing a running answer. */
+function autoRun() {
+  if (!autoOn) return;
+  if (!abort) return run();
+  abort.abort();
+  const wait = setInterval(() => { if (!abort) { clearInterval(wait); run(); } }, 30);
+}
+
+/* ---- sidebar ---- */
+function closePanels() {
+  document.querySelectorAll('.sb-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.sb-item.active').forEach(b => b.classList.remove('active'));
+}
+$('sb-toggle').onclick = () => { if (sb.classList.toggle('open') === false) closePanels(); };
+function togglePanel(btn, pnl) {
+  const was = $(pnl).classList.contains('open');
+  closePanels(); sb.classList.add('open');
+  if (!was) { $(pnl).classList.add('open'); $(btn).classList.add('active'); }
+}
+$('btn-lang').onclick = () => togglePanel('btn-lang', 'pnl-lang');
+$('btn-ex').onclick = () => togglePanel('btn-ex', 'pnl-ex');
+
+function loadExample(ex) { input.value = ex.text; onInput(); input.focus(); autoRun(); }
+for (const ex of EXAMPLES) {
+  const b = document.createElement('button');
+  b.className = 'ex-btn'; b.type = 'button'; b.textContent = ex.label;
+  b.onclick = () => loadExample(ex);
+  $('pnl-ex').appendChild(b);
+}
+
+/* ---- draggable divider ---- */
+(function () {
+  const dv = $('dv'), main = $('main');
+  let dragging = false;
+  dv.addEventListener('pointerdown', e => { dragging = true; userResized = true; dv.setPointerCapture(e.pointerId); dv.classList.add('drag'); tp.classList.add('dragging'); });
+  dv.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const r = main.getBoundingClientRect();
+    tp.style.height = Math.min(Math.max(e.clientY - r.top, 130), r.height - 160) + 'px';
+  });
+  const stop = () => { dragging = false; dv.classList.remove('drag'); tp.classList.remove('dragging'); };
+  dv.addEventListener('pointerup', stop);
+  dv.addEventListener('pointercancel', stop);
+})();
+
+/* ---- drop a log file onto the paste area ---- */
+const dz = $('dz');
+const hasFiles = e => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+dz.addEventListener('dragover', e => { if (hasFiles(e)) { e.preventDefault(); dz.classList.add('over'); } });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', async e => {
+  dz.classList.remove('over');
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f.size > 200000) return toast('File too large (max 200 KB)');
+  input.value = await f.text(); onInput(); autoRun();
+});
+
+/* ---- empty state, input info ---- */
+function showEmpty() {
+  stage.innerHTML =
+    `<div class="empty"><h1>Error Message Explainer</h1>` +
+    `<p class="sub">Paste an error message. Get the cause and a fix.</p>` +
+    `<p class="try">Try an example</p><div class="chips"></div></div>`;
+  const chips = stage.querySelector('.chips');
+  for (const ex of EXAMPLES) {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.type = 'button'; b.textContent = ex.label;
+    b.onclick = () => loadExample(ex);
+    chips.appendChild(b);
+  }
+}
+
+/* Live summary under the paste area: language, where, what. */
+function onInput() {
+  warn.hidden = true;
+  const sel = langSel.value, t = input.value.trim();
+  $('lang-cur').textContent = sel === 'auto' ? 'Auto' : LANG_LABEL[sel];
+  let head;
+  if (sel !== 'auto') head = `Language: ${LANG_LABEL[sel]}`;
+  else {
+    const d = t ? detect(t) : null;
+    head = d && d.lang ? `Detected ${LANG_LABEL[d.lang]}` : 'Language: auto-detect';
+  }
+  const bits = [head];
+  if (t) { const f = annotate(t).facts; if (f.where) bits.push(f.where); if (f.type) bits.push(f.type); }
+  $('tp-info').textContent = bits.join(' · ');
+}
+
+/* The pasted error, with location / error type / symbol marked (no model involved). */
+function addAsk(text, lang) {
+  const a = annotate(text);
+  const el = document.createElement('div');
+  el.className = 'ask';
+  const long = text.split('\n').length > 8;
+  if (long) el.classList.add('collapsed');
+  const chips = [['Where', 'loc', a.facts.where], ['Type', 'type', a.facts.type], ['Symbol', 'sym', a.facts.symbol]]
+    .filter(c => c[2]).map(([k, cls, v]) => `<span class="fact ${cls}"><b>${k}</b>${esc(v)}</span>`).join('');
+  el.innerHTML =
+    `<div class="ask-meta"><span class="lang"></span><span class="facts">${chips}</span></div><pre></pre>` +
+    (long ? `<button class="more" type="button">Show all</button>` : '');
+  el.querySelector('.lang').textContent = lang ? LANG_LABEL[lang] : 'Error';
+  el.querySelector('pre').innerHTML = a.segments.map(s => s.kind ? `<mark class="a-${s.kind}">${esc(s.text)}</mark>` : esc(s.text)).join('');
+  const t = el.querySelector('.more');
+  if (t) t.onclick = () => { const c = el.classList.toggle('collapsed'); t.textContent = c ? 'Show all' : 'Collapse'; };
+  stage.appendChild(el);
+}
+
+function addAnswer() {
+  const el = document.createElement('section');
+  el.innerHTML =
+    `<div class="sec" data-sec="why" hidden><div class="sec-head"><h2>Why</h2></div><div class="md"></div></div>` +
+    `<div class="sec" data-sec="fix" hidden><div class="sec-head"><h2>Fix</h2><button class="ghost copy-fix" type="button">Copy</button></div><div class="md"></div></div>` +
+    `<div class="md raw" hidden></div>` +
+    `<div class="thinking"></div>` +
+    `<div class="foot"><span class="stats"></span><button class="ghost md-copy" type="button" hidden>Copy as Markdown</button></div>`;
+  stage.appendChild(el);
+  return el;
+}
+
+function renderAnswer(el, text, streaming) {
+  const s = parseSections(text);
+  const why = el.querySelector('[data-sec="why"]'), fix = el.querySelector('[data-sec="fix"]'), raw = el.querySelector('.raw');
+  if (s) {
+    raw.hidden = true; raw.innerHTML = '';              // drop the plain-text fallback (and its cursor) once the sections are recognised
+    why.hidden = !s.why; fix.hidden = !s.fix;
+    if (s.why) why.querySelector('.md').innerHTML = marked.parse(s.why);
+    if (s.fix) fix.querySelector('.md').innerHTML = marked.parse(s.fix);
+  } else {
+    why.hidden = fix.hidden = true;
+    raw.hidden = !text; raw.innerHTML = marked.parse(text);
+  }
+  if (streaming) addCaret(el);
+}
+/* Blinking cursor at the end of whatever is currently being written. */
+function addCaret(el) {
+  const vis = [...el.querySelectorAll('.sec:not([hidden]) .md, .raw:not([hidden])')];
+  const target = vis[vis.length - 1];
+  if (!target) return;
+  const c = document.createElement('span');
+  c.className = 'caret';
+  const lastEl = target.lastElementChild;
+  (lastEl && lastEl.tagName === 'P' ? lastEl : target).appendChild(c);
+}
+
+/* ---- copy ---- */
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy'); ta.remove();
+    if (!ok) return toast('Copy failed');
+  }
+  toast('Copied');
+}
+/* The solution: all code blocks in the Fix section, or its plain text if it has none. */
+function fixText() {
+  const sec = stage.querySelector('[data-sec="fix"]');
+  if (!sec || sec.hidden) return null;
+  const blocks = [...sec.querySelectorAll('.code code')].map(c => c.textContent);
+  return blocks.length ? blocks.join('\n\n') : sec.querySelector('.md').innerText;
+}
+/* Error + answer as one Markdown snippet, ready for an issue, a chat or a homework note. */
+function toMarkdown() {
+  if (!lastRun) return null;
+  const label = lastRun.lang ? LANG_LABEL[lastRun.lang] : 'unknown language';
+  return `**Error** (${label})\n\n\`\`\`text\n${lastRun.text}\n\`\`\`\n\n${lastRun.answer.trim()}\n`;
+}
+stage.addEventListener('click', e => {
+  const btn = e.target.closest('button.copy, button.copy-fix, button.md-copy');
+  if (!btn) return;
+  if (btn.classList.contains('copy')) copyText(btn.closest('.code').querySelector('code').textContent);
+  else if (btn.classList.contains('md-copy')) copyText(toMarkdown());
+  else copyText(fixText());
+});
+$('btn-copy').onclick = () => { const t = fixText(); t ? copyText(t) : toast('Nothing to copy yet'); };
+$('btn-md').onclick = () => { const t = toMarkdown(); t ? copyText(t) : toast('Nothing to copy yet'); };
+
+function clearAll() {
+  if (abort) abort.abort();
+  lastRun = null; showEmpty(); input.value = ''; onInput(); bp.scrollTop = 0; restoreTop();
+}
+$('btn-clr').onclick = clearAll;
+
+function setBusy(busy) {
+  go.innerHTML = `<span class="ic">${svg(busy ? 'stop' : 'play')}</span>${busy ? 'Stop' : 'Explain'}`;
+}
+
+/* ---- run one question (streams into the bottom panel) ---- */
+async function run(force = false) {
+  if (abort) { abort.abort(); return; }                 // button acts as Stop while running
+  const text = input.value.trim();
+  if (!text) return;
+  const sel = langSel.value;                            // 'auto' | 'python' | 'java' | 'cpp'
+  let lang = detect(text, sel === 'auto' ? null : sel).lang;
+  if (!lang && !force) {
+    const what = sel === 'auto' ? 'a Python, Java or C++ error message' : `a ${LANG_LABEL[sel]} error message`;
+    warn.innerHTML = `This doesn't look like ${what}. <button type="button">Submit anyway</button>`;
+    warn.querySelector('button').onclick = () => run(true);
+    warn.hidden = false;
+    return;
+  }
+  if (!lang && sel !== 'auto') lang = sel;              // forced with a manual choice: trust the user
+  warn.hidden = true;
+
+  stage.innerHTML = '';
+  bp.scrollTop = 0;
+  compactTop();
+  addAsk(text, lang);
+  const ans = addAnswer();
+  const statsEl = ans.querySelector('.stats');
+  abort = new AbortController();
+  setBusy(true);
+
+  const payload = clip(text);
+  const t0 = performance.now();
+  let first = null, chunks = 0, buf = '', frame = false, finished = false;
+  const paint = () => {
+    frame = false;
+    if (finished) return;                                                   // a repaint queued by the last chunk must not bring the cursor back
+    const follow = bp.scrollHeight - bp.scrollTop - bp.clientHeight < 80;   // keep following unless the user scrolled up
+    renderAnswer(ans, buf, true);
+    if (CONFIG.mode !== 'mock' && first !== null) {                         // live speed meter
+      const gen = (performance.now() - first) / 1000;
+      statsEl.classList.add('live');
+      statsEl.textContent = `first token ${((first - t0) / 1000).toFixed(2)}s · ~${gen > 0.2 ? Math.round(chunks / gen) : '…'} tok/s`;
+    }
+    if (follow) bp.scrollTop = bp.scrollHeight;
+  };
+  try {
+    const stream = CONFIG.mode === 'mock' ? mockStream(payload, abort.signal) : apiStream(payload, lang, abort.signal);
+    for await (const d of stream) {
+      if (first === null) { first = performance.now(); ans.querySelector('.thinking').hidden = true; }
+      buf += d; chunks++;
+      if (!frame) { frame = true; requestAnimationFrame(paint); }
+    }
+    if (!abort.signal.aborted) { input.value = ''; onInput(); }   // keep the text if the user pressed Stop
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      const box = document.createElement('div');
+      box.className = 'error-box';
+      box.textContent = CONFIG.mode === 'mock'
+        ? String(err)
+        : `Request failed\n${err.message}\n\nCheck that the model server is running (${CONFIG.apiUrl}) and allows cross-origin requests (Ollama: OLLAMA_ORIGINS=*).`;
+      ans.appendChild(box);
+    }
+  } finally {
+    ans.querySelector('.thinking').hidden = true;
+    finished = true;
+    renderAnswer(ans, buf, false);                      // final render: no cursor
+    statsEl.classList.remove('live');
+    const total = (performance.now() - t0) / 1000;
+    if (first !== null && CONFIG.mode !== 'mock') {
+      const gen = (performance.now() - first) / 1000;
+      statsEl.textContent =
+        `first token ${((first - t0) / 1000).toFixed(2)}s · ~${gen > 0 ? Math.round(chunks / gen) : '-'} tok/s · ${total.toFixed(1)}s total · running locally`;
+    } else statsEl.textContent = '';
+    if (buf.trim()) { lastRun = { text, lang, answer: buf }; ans.querySelector('.md-copy').hidden = false; }
+    abort = null; setBusy(false);
+  }
+}
+
+go.onclick = () => run();
+input.addEventListener('input', onInput);
+langSel.addEventListener('change', onInput);
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); } });
+/* Paste into an empty box = "explain this". The value only changes after the event, hence the tick. */
+input.addEventListener('paste', () => {
+  const wasEmpty = !input.value.trim();
+  setTimeout(() => { if (wasEmpty && input.value.trim()) { onInput(); autoRun(); } }, 0);
+});
+showEmpty(); setBusy(false); paintAuto(); onInput(); loadShared();
+</script>
+</body>
+</html>

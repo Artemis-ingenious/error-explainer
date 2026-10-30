@@ -1,0 +1,3 @@
+@echo off
+rem Windows shim: put this folder on PATH, then run  explain ...
+node "%~dp0explain.js" %*

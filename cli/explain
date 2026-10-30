@@ -1,0 +1,3 @@
+#!/bin/sh
+# Unix / Git Bash shim: put this folder on PATH, then run  explain ...
+exec node "$(dirname "$0")/explain.js" "$@"

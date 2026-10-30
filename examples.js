@@ -1,0 +1,25 @@
+// Demo examples. Python is hand-written; the rest come from data/*.jsonl (training outputs, not model outputs).
+// Mock mode matches the pasted text exactly. Swap in held-out samples once the eval split exists.
+const EXAMPLES = [
+  { label: "Python",
+    text: "Traceback (most recent call last):\n  File \"main.py\", line 5, in <module>\n    total = count + label\nTypeError: unsupported operand type(s) for +: 'int' and 'str'",
+    answer: "## Why\nLine 5 tries to add an `int` (`count`) to a `str` (`label`) with `+`. Python never converts between them implicitly, so it raises `TypeError`.\n\n## Fix\nMake both sides the same type before combining them:\n\n```python\ntotal = str(count) + label      # string concatenation\n# or\ntotal = f\"{count}{label}\"\n```\n\nIf you actually wanted numeric addition, convert `label` first with `int(label)`." },
+  { label: "Java · NPE",
+    text: "$ java Profile\nException in thread \"main\" java.lang.NullPointerException: Cannot invoke \"String.length()\" because \"this.nickname\" is null\n\tat Profile.nickLength(Profile.java:9)\n\tat Profile.main(Profile.java:14)",
+    answer: "## Why\nLine 9 of `Profile.java` calls `length()` on `this.nickname`, which is `null`. A `String` field stays `null` until something assigns it, and nothing did before `nickLength()` was called from line 14.\n## Fix\nAssign the field before using it, or guard against `null`.\n```java\npublic int nickLength() {\n    return nickname == null ? 0 : nickname.length();\n}\n```\nAlternatively, call `setNickname(...)` before `nickLength()`." },
+  { label: "Java · symbol (zh)",
+    text: "PS D:\\java\\hw> javac Main.java\nMain.java:11: 错误: 找不到符号\n        System.out.println(\"sum = \" + total);\n                                      ^\n  符号:   变量 total\n  位置: 类 Main\n1 个错误",
+    answer: "## Why\n`Main.java` 第 11 行用到了变量 `total`,但编译器在当前作用域里找不到它的声明。多半是变量名拼写不一致,或者根本没声明。\n## Fix\n改成你实际声明的变量名,或先声明再使用。\n```java\nint total = 0;  // 先声明, 再在循环里累加\n```\n如果你累加用的变量叫别的名字,直接把第 11 行改成那个名字。" },
+  { label: "Java · mixed",
+    text: "Exception in thread \"main\" java.lang.RuntimeException: Order failed\n\tat OrderApp.placeOrder(OrderApp.java:17)\n\tat OrderApp.main(OrderApp.java:23)\nCaused by: java.lang.IllegalStateException: 库存不足: 商品 A102 剩余 2, 需要 5\n\tat OrderApp$Inventory.reserve(OrderApp.java:7)\n\tat OrderApp.placeOrder(OrderApp.java:15)\n\t... 1 more",
+    answer: "## Why\n`Order failed` 只是外层包装,根本原因在 `Caused by`:`OrderApp.java` 第 7 行的 `reserve` 发现库存只剩 2、需要 5,抛出 `IllegalStateException`,第 17 行把它包装后重新抛出。\n## Fix\n下单前减少数量或补货,并在调用处捕获异常。\n```java\ntry {\n    placeOrder(inv, \"A102\", 5);\n} catch (RuntimeException e) {\n    System.out.println(\"下单失败: \" + e.getCause().getMessage());\n}\n```" },
+  { label: "C++ · linker (zh)",
+    text: "$ g++ main.cpp -o app\nmain.cpp:(.text+0x2d): 对‘add(int, int)’未定义的引用\ncollect2: 错误:ld 返回 1",
+    answer: "## Why\n链接器找不到 `add(int, int)` 的函数体(`未定义的引用`)。`main.cpp` 里只有声明,定义要么没写,要么在另一个 `.cpp` 文件里而没有一起编译。\n## Fix\n在本文件补上定义:\n```cpp\nint add(int a, int b) {\n    return a + b;\n}\n```\n如果定义在 `util.cpp`,则需要把它一起编译:`g++ main.cpp util.cpp -o app`。" },
+  { label: "C++ · double free",
+    text: "$ ./app\n1\nreleased\nfree(): double free detected in tcache 2\nAborted (core dumped)",
+    answer: "## Why\nglibc detected the same heap block being freed twice (`double free`) and aborted. This usually means two pointers to one allocation were both passed to `delete`/`free`, or a pointer was deleted again after it was already released. The message has no line number; `released` shows the first free already happened.\n## Fix\nRelease each allocation exactly once and null the pointers afterwards.\n```cpp\ndelete[] data;\ndata = nullptr;\ncopy = nullptr;  // same block, do not delete it again\n```\nUsing `std::vector` or `std::unique_ptr` avoids manual deletes." },
+  { label: "C++ · MSVC (zh)",
+    text: "D:\\code\\cpp>cl /EHsc main.cpp\n用于 x64 的 Microsoft (R) C/C++ 优化编译器 19.38.33130 版\n版权所有(C) Microsoft Corporation。保留所有权利。\n\nmain.cpp\nmain.cpp(9): error C2065: “sum”: 未声明的标识符\nmain.cpp(11): error C2065: “sum”: 未声明的标识符",
+    answer: "## Why\n`main.cpp` 第 9 行和第 11 行用到了 `sum`,但编译器找不到它的声明(C2065)。多半是忘了定义累加变量,或者名字拼写不一致。\n## Fix\n在循环之前声明并初始化它。\n```cpp\nint sum = 0;  // 放在 for 循环之前\n```" },
+];

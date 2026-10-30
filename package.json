@@ -1,0 +1,12 @@
+{
+  "name": "error-explainer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paste an error message, get Why + Fix from a local model. Web page and CLI.",
+  "bin": { "explain": "cli/explain.js" },
+  "scripts": {
+    "mock": "node dev/mock-server.js",
+    "validate": "node dev/validate.js data/*.jsonl"
+  },
+  "engines": { "node": ">=18" }
+}
